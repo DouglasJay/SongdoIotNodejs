@@ -10,6 +10,62 @@ var connection = mysql.createConnection({
 });
  
 connection.connect();
+//------------2017-11-07 mongodb adding----------------
+var MongoClient = require('mongodb').MongoClient;
+ 
+// Connection URL
+var url = 'mongodb://localhost:27017/iot';
+var dbObj = null;
+// Use connect method to connect to the Server
+MongoClient.connect(url, function(err, db) {
+  console.log("Connected correctly to server");
+  dbObj = db;  
+});
+//--------------------mongodb end----------------------
+//-------------2017-11-07 mqtt adding------------------
+var mqtt = require('mqtt')
+var client  = mqtt.connect('mqtt://192.168.0.35') //mqtt ip
+ 
+client.on('connect', function () {
+  client.subscribe('test')  // topic test 변경
+  client.subscribe('arduino')
+  client.publish('test', 'Hello mqtt')  // topic test 변경
+})
+ 
+client.on('message', function (topic, message) {
+  // message is Buffer
+  console.log(topic+":"+message.toString())
+  if (topic == 'arduino') {
+  	var dht11Logs = dbObj.collection('dht11Logs');
+  	var json = JSON.parse(message.toString());
+  	json.device = 'arduino';
+  	json.sensor = 'dht11';
+  	json.created_at = new Date();
+  	dht11Logs.save(json, function(err, results) {});
+  }
+  //client.end()
+})
+//--------------------mqtt end----------------------------
+ 
+//-------------2017-11-07 buzzer adding------------------
+router.post('/:buzzer/:flag', function(req, res, next) {
+	if (req.params.flag == 'on') {
+		client.publish('test', '1');
+		res.send(JSON.stringify({buzzer:'on'}));		
+	} else {
+		client.publish('test', '0');
+		res.send(JSON.stringify({buzzer:'off'}));
+	}
+});
+//-------------------buzzer end----------------------------
+
+router.get('/:device/:sensor', function(req, res, next) {
+	var dht11Logs = dbObj.collection('dht11Logs');
+	dht11Logs.find({device:req.params.device,sensor:req.params.sensor}).toArray(function(err, results) {
+		if (err) res.send(JSON.stringify(err));
+		else res.send(JSON.stringify(results));
+	});
+});
 
 /* GET devices 전체 listing. */
 router.get('/', function(req, res, next) {
